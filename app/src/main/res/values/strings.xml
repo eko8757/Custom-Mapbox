@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Custom Mapbox</string>
+    <string name="default_public_api_key">pk.eyJ1IjoiZWtvODc1NyIsImEiOiJjazMzdDY2ODQwdmhvM2hvMjFyNm9icGhuIn0.9Hb_qdwcCIzX566pY4sLDQ</string>
+    <string name="info">Info</string>
+    <string name="permissions_denied">Permissions denied</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="change_style_maps">Change style maps</string>
+</resources>
