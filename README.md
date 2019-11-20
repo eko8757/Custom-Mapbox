@@ -14,5 +14,8 @@ Settings dependency in build.gradle(Project)
    url 'https://mapbox.bintray.com/mapbox'
 }
 ```
+![Preview](Selection_020.png)
+![Preview](Selection_021.png)
+![Preview](Selection_022.png)
 
 https://docs.mapbox.com/help/how-mapbox-works/access-tokens/
