@@ -10,7 +10,7 @@
         android:id="@+id/main_mapView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:mapbox_cameraZoom="12" />
+        app:mapbox_cameraZoom="16" />
 
     <Button
         android:id="@+id/button_start_navigation"
@@ -24,5 +24,16 @@
         android:text="Start Navigation"
         android:visibility="gone"
         app:layout_constraintBottom_toBottomOf="parent" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_search"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:tint="@android:color/white"
+        android:backgroundTint="@color/colorPrimary"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:srcCompat="@android:drawable/ic_search_category_default"
+        app:layout_constraintBottom_toBottomOf="parent"/>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

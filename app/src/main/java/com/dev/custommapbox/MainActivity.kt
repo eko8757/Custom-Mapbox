@@ -1,5 +1,8 @@
 package com.dev.custommapbox
 
+import android.app.Activity
+import android.content.Intent
+import android.graphics.Color
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.view.Menu
@@ -12,15 +15,24 @@ import com.mapbox.android.core.permissions.PermissionsManager
 import com.mapbox.api.directions.v5.DirectionsCriteria
 import com.mapbox.api.directions.v5.models.DirectionsResponse
 import com.mapbox.api.directions.v5.models.DirectionsRoute
+import com.mapbox.api.geocoding.v5.models.CarmenFeature
+import com.mapbox.geojson.Feature
+import com.mapbox.geojson.FeatureCollection
 import com.mapbox.geojson.Point
 import com.mapbox.mapboxsdk.Mapbox
 import com.mapbox.mapboxsdk.annotations.Marker
 import com.mapbox.mapboxsdk.annotations.MarkerOptions
+import com.mapbox.mapboxsdk.camera.CameraPosition
+import com.mapbox.mapboxsdk.camera.CameraUpdateFactory
+import com.mapbox.mapboxsdk.geometry.LatLng
 import com.mapbox.mapboxsdk.location.modes.CameraMode
 import com.mapbox.mapboxsdk.location.modes.RenderMode
 import com.mapbox.mapboxsdk.maps.MapboxMap
 import com.mapbox.mapboxsdk.maps.OnMapReadyCallback
 import com.mapbox.mapboxsdk.maps.Style
+import com.mapbox.mapboxsdk.plugins.places.autocomplete.PlaceAutocomplete
+import com.mapbox.mapboxsdk.plugins.places.autocomplete.model.PlaceOptions
+import com.mapbox.mapboxsdk.style.sources.GeoJsonSource
 import com.mapbox.services.android.navigation.ui.v5.NavigationLauncher
 import com.mapbox.services.android.navigation.ui.v5.NavigationLauncherOptions
 import com.mapbox.services.android.navigation.ui.v5.route.NavigationMapRoute
@@ -32,11 +44,13 @@ import retrofit2.Response
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
-    lateinit var permissionsManager : PermissionsManager
+    lateinit var permissionsManager: PermissionsManager
     lateinit var mapBoxMap: MapboxMap
     private val markers = ArrayList<Marker>()
     private lateinit var currentRoute: DirectionsRoute
     private var navigationMapRoute: NavigationMapRoute? = null
+    private var REQUEST_AUTO_COMPLETE = 1
+    private val geojsonSourceLayerID = "geojsonSourceLayerId"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,41 +69,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    override fun onStart() {
-        super.onStart()
-        main_mapView.onStart()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        main_mapView.onResume()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        main_mapView.onPause()
-    }
-
-    override fun onStop() {
-        super.onStop()
-        main_mapView.onStop()
-    }
-
-    override fun onLowMemory() {
-        super.onLowMemory()
-        main_mapView.onLowMemory()
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        main_mapView.onDestroy()
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        main_mapView.onSaveInstanceState(outState)
-    }
-
     private fun initMapView(savedInstanceState: Bundle?) {
         main_mapView.onCreate(savedInstanceState)
     }
@@ -99,6 +78,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         this.mapBoxMap.setStyle(Style.MAPBOX_STREETS) {
             //showing device location
             showingDeviceLocation(mapboxMap)
+            initSearchFab()
         }
 
         //add markers
@@ -110,12 +90,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
             markers.add(
                 mapBoxMap.addMarker(
-                    MarkerOptions().position(it))
+                    MarkerOptions().position(it)
+                )
             )
 
             if (markers.size == 2) {
-                val originPoint = Point.fromLngLat(markers[0].position.longitude, markers[0].position.latitude)
-                val destinationPoint = Point.fromLngLat(markers[1].position.longitude, markers[1].position.latitude)
+                val originPoint =
+                    Point.fromLngLat(markers[0].position.longitude, markers[0].position.latitude)
+                val destinationPoint =
+                    Point.fromLngLat(markers[1].position.longitude, markers[1].position.latitude)
                 NavigationRoute.builder(this)
                     .accessToken(Mapbox.getAccessToken()!!)
                     .origin(originPoint)
@@ -124,18 +107,33 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                     .build()
                     .getRoute(object : Callback<DirectionsResponse> {
                         override fun onFailure(call: Call<DirectionsResponse>, t: Throwable) {
-                            Toast.makeText(this@MainActivity, "Error occured: ${t.message}", Toast.LENGTH_LONG)
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Error occured: ${t.message}",
+                                Toast.LENGTH_LONG
+                            )
                                 .show()
                         }
 
-                        override fun onResponse(call: Call<DirectionsResponse>, response: Response<DirectionsResponse>) {
+                        override fun onResponse(
+                            call: Call<DirectionsResponse>,
+                            response: Response<DirectionsResponse>
+                        ) {
                             if (response.body() == null) {
-                                Toast.makeText(this@MainActivity, "No routes found, make sure you set the right user and access token.", Toast.LENGTH_LONG)
+                                Toast.makeText(
+                                    this@MainActivity,
+                                    "No routes found, make sure you set the right user and access token.",
+                                    Toast.LENGTH_LONG
+                                )
                                     .show()
                                 button_start_navigation.visibility = View.GONE
                                 return
                             } else if (response.body()!!.routes().size < 1) {
-                                Toast.makeText(this@MainActivity, "No routes found", Toast.LENGTH_LONG)
+                                Toast.makeText(
+                                    this@MainActivity,
+                                    "No routes found",
+                                    Toast.LENGTH_LONG
+                                )
                                     .show()
                                 button_start_navigation.visibility = View.GONE
                                 return
@@ -144,7 +142,12 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                             if (navigationMapRoute != null) {
                                 navigationMapRoute?.removeRoute()
                             } else {
-                                navigationMapRoute = NavigationMapRoute(null, main_mapView, mapboxMap, R.style.NavigationMapRoute)
+                                navigationMapRoute = NavigationMapRoute(
+                                    null,
+                                    main_mapView,
+                                    mapboxMap,
+                                    R.style.NavigationMapRoute
+                                )
                             }
                             navigationMapRoute?.addRoute(currentRoute)
                             button_start_navigation.visibility = View.VISIBLE
@@ -159,12 +162,64 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         //remove markers
         this.mapBoxMap.setOnMarkerClickListener {
             for (marker in markers) {
-                if (marker.position == it.position)  {
+                if (marker.position == it.position) {
                     markers.remove(marker)
                     mapBoxMap.removeMarker(marker)
                 }
             }
             true
+        }
+    }
+
+    private fun initSearchFab() {
+        fab_search.setOnClickListener {
+            val intent: Intent = PlaceAutocomplete.IntentBuilder()
+                .accessToken(
+                    if (Mapbox.getAccessToken() != null) Mapbox.getAccessToken().toString() else getString(
+                        R.string.default_public_api_key
+                    )
+                )
+                .placeOptions(
+                    PlaceOptions.builder()
+                        .backgroundColor(Color.parseColor("#EEEEEE"))
+                        .limit(10)
+                        .build(PlaceOptions.MODE_CARDS)
+                )
+                .build(this)
+            startActivityForResult(intent, REQUEST_AUTO_COMPLETE)
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        val selectedCarmenFeature: CarmenFeature = PlaceAutocomplete.getPlace(data)
+
+        if (resultCode == Activity.RESULT_OK && requestCode == REQUEST_AUTO_COMPLETE) {
+            if (mapBoxMap != null) {
+                var style: Style? = mapBoxMap.getStyle()
+                if (style != null) {
+                    style.getSourceAs<GeoJsonSource>(geojsonSourceLayerID)?.setGeoJson(
+                        FeatureCollection.fromFeatures(
+                            arrayOf(Feature.fromJson(selectedCarmenFeature.toJson()))
+                        )
+                    )
+                }
+            }
+
+            mapBoxMap.animateCamera(
+                CameraUpdateFactory.newCameraPosition(
+                    CameraPosition.Builder()
+                        .target(
+                            LatLng(
+                                (selectedCarmenFeature.geometry() as Point).latitude(),
+                                (selectedCarmenFeature.geometry() as Point).longitude()
+                            )
+                        )
+                        .zoom(14.0)
+                        .build()
+                ), 4000
+            )
         }
     }
 
@@ -270,11 +325,50 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         locationComponent.renderMode = RenderMode.COMPASS
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
         permissionsManager.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
 
     private fun syncMapbox() {
         main_mapView.getMapAsync(this)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        main_mapView.onStart()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        main_mapView.onResume()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        main_mapView.onPause()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        main_mapView.onStop()
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        main_mapView.onLowMemory()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        main_mapView.onDestroy()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        main_mapView.onSaveInstanceState(outState)
     }
 }
